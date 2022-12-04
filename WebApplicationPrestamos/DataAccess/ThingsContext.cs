@@ -41,9 +41,7 @@ namespace WebApplicationPrestamos.DataAccess
         public DbSet<Thing> Things { get; set; }
         public DbSet<Person> People { get; set; }
 
- 
-        //Agregar durante las clases de teoria.
-        //public DbSet<Loan> Loans { get; set; }
+        public DbSet<Loan> Loans { get; set; }
     }
 
     /* Comandos PMC

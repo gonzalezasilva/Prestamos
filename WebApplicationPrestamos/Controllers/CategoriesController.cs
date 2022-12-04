@@ -4,7 +4,6 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using WebApplicationPrestamos.DataAccess;
 using WebApplicationPrestamos.Entities;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace WebApplicationPrestamos.Controllers
@@ -13,149 +12,97 @@ namespace WebApplicationPrestamos.Controllers
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public class CategoriesController : ControllerBase
     {
-        private readonly ThingsContext thingsContext;
 
-        public CategoriesController(ThingsContext context)
+        private readonly IUnitOfWork uow;
+
+
+        public CategoriesController(IUnitOfWork uow)
         {
-            thingsContext = context;
+            this.uow = uow;
         }
 
         [HttpPost]
-        public void Create()
+        public ActionResult<Category> Create([FromBody] Category category) 
         {
-            var categories = new List<Category> {
-                 new Category {
-                    Description = "Books"
-                },
-                 new Category {
-                    Description = "Tools"
-                },
-                 new Category {
-                    Description = "Others"
-                }
+            var categorysearch = new Category();
+            categorysearch = uow.CategoryRepository.GetByDescription(category.Description);
+
+            if (categorysearch == null)
+            {
+                uow.CategoryRepository.Add(category);
+                uow.Complete();
+                return category;
+            }
+           else
+             { 
+                return BadRequest("Ya existe la categoría.");
             };
-            thingsContext.Categories.AddRange(categories);
-            thingsContext.SaveChanges();
+            
+                 
         }
 
-        [HttpGet]
-        public List<Category> GetCategories()
-        {
-            return thingsContext.Categories.ToList();
-        }
-
-        [HttpGet]
+        [HttpDelete]
         [Route("{id}")]
-        public ActionResult<Category>? GetCategoryById(int id)
+        public ActionResult Remove(int id)
         {
-            return thingsContext.Categories.FirstOrDefault(c => c.Id == id);
-        }
-
-        // Ver que este metodo nos devuelve ActionResult<Category>.
-        // Esto nos permite devolver metodos como BadRequest & NotFound que utilizan diferentes estados del protocolo HTTP.
-        // Esto lo vamos a ver con mas profundidad en el modulo de HTTP.
-        [HttpPatch]
-        [Route("{id}")]
-        public ActionResult<Category> UpdateCategoryDescription (int id, [FromBody]Category category) //Tengamos presente que normalmente las entidades NO se utilizan como request de APIs
-        {
-            if (string.IsNullOrWhiteSpace(category?.Description))
-                return BadRequest("Description must be provided.");
-
-            var dbCategory = thingsContext.Categories.FirstOrDefault(c => c.Id == id);
-            if (dbCategory == null)
+            var deleted = uow.CategoryRepository.Delete(id);
+            if (!deleted)
                 return NotFound();
 
-            dbCategory.Description = category.Description;
-            thingsContext.SaveChanges(); //El ChangeTracker conoce a esta entidad, por lo que llamando al metodo SaveChanges podremos impactar los cambios en BBDD.
+            uow.Complete();
 
-            return dbCategory;
+            return NoContent();
+
+
         }
 
         [HttpGet]
-        [Route("filters")]
-        public List<Category> GetCategoriesByFilters([FromQuery]string description)
+        public ActionResult<List<Category>> GetAll()
         {
-            return thingsContext.Categories.Where(c => c.Description.Contains(description)).ToList();
+            return uow.CategoryRepository.GetAll();
         }
 
         [HttpGet]
-        [Route("withItems")]
-        public List<Category> GetCategoriesThatHasThings()
+        [Route("{id}")]
+        public ActionResult<Category> GetById(int id)
         {
-            return thingsContext.Categories
-                .Include(c => c.Things)
-                .Where(c => c.Things.Any())
-                .ToList();
+
+            return uow.CategoryRepository.GetById(id);
         }
 
         [HttpPut]
         [Route("{id}")]
-        public ActionResult<Category> FullUpdate(int id, [FromBody]Category category)
+        public ActionResult<Category> Update(int id, [FromBody] Category category)
         {
             if (id <= 0)
-                return BadRequest("Id must be higher than 0");
+                return BadRequest("El Id debe ser mayor a cero.");
 
-            //En proyectos mas grandes es posible que primero busquen si el registro existe, si no existe, se puede devolver NotFound(). Si existe, se realiza el update.
+            if (uow.CategoryRepository.GetById(id) is null)
+                return NotFound();
 
-            category.Id = id; 
-            var savedEntity = thingsContext.Update(category);
-            thingsContext.SaveChanges();
+            var savedEntity = uow.CategoryRepository.Update(category);
 
-            return savedEntity.Entity;
+            return savedEntity;
         }
 
-        [HttpGet]
-        [Route("first")]
-        public ActionResult<Category> GetFirstCategory()
+
+        [HttpPatch]
+        [Route("{id}")]
+        public ActionResult<Category> UpdateCategoryDescription(int id, [FromBody] Category category)
         {
-            //En esta accion vamos a probar varias funcionalidades.
-            //FirstOrDefault -> Devuelve (null) si el registro no existe
-            //First          -> lanza excepcion si el registro no existe
-            //Permiten filtrar. Ver debajo.
-            var catNotReturned = thingsContext.Categories
-                .FirstOrDefault(cat => cat.Description.StartsWith("NonExisting"));
-            if (catNotReturned is not null)
-                return StatusCode(500);
+            if (string.IsNullOrWhiteSpace(category?.Description))
+                return BadRequest("La descripción de la categoría no puede ser vacía.");
 
-            return thingsContext.Categories.First(); 
+            var dbCategory = uow.CategoryRepository.GetById(id);
+            if (dbCategory == null)
+                return NotFound();
+
+            dbCategory.Description = category.Description;
+            uow.Complete();
+
+            return category;
         }
-
-        [HttpGet]
-        [Route("rawsql")]
-        public List<Category> RawSql()
-        {
-            return thingsContext
-                .Categories
-                .FromSqlRaw("SELECT Id, Description FROM Categories")
-                .ToList();
-        }
-
-        [HttpGet]
-        [Route("storedprocedure")]
-        public List<Category> FromStoredProcedure(string description)
-        {
-            //Normalmente la creacion y actualizacion de Stored Procedures son parte de migraciones.
-            /*
-             CREATE OR ALTER PROCEDURE GetCategories 
-	            @Description nvarchar(100) = NULL
-             AS
-            BEGIN
-	            SELECT Id, [Description] FROM Categories
-	            WHERE @Description IS NULL
-	            OR [Description] = @Description;
-            END;
-             
-             */
-
-            object parameterValue = string.IsNullOrWhiteSpace(description)?
-                                            DBNull.Value :
-                                            description;
-            var sqlParameter = new SqlParameter[] { new SqlParameter("Description", parameterValue) };
-
-            return thingsContext
-                    .Categories
-                    .FromSqlRaw($"GetCategories @Description", sqlParameter)
-                    .ToList();
-        }
+        
+       
     }
 }

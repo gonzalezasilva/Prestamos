@@ -9,7 +9,9 @@ using WebApplicationPrestamos.Handlers;
 using System.Security.Cryptography.Xml;
 using System.Text;
 using System.Text.Json.Serialization;
-
+using WebApplicationPrestamos.Protos;
+using Microsoft.AspNetCore.Builder;
+using WebApplicationPrestamos.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,8 +23,10 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: MyAllowSpecificOrigins,
         policy =>
         {
-            policy.WithOrigins("http://localhost:4200")
-                   .AllowAnyHeader();
+            policy.SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost")
+            .AllowAnyHeader() .AllowAnyMethod();
+           // policy.WithOrigins("http://localhost:4200")
+           //        .AllowAnyHeader();
         });
 });
 
@@ -66,7 +70,10 @@ builder.Services.AddAuthorization();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("JWT"));
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+builder.Services.AddTransient<ILoanService, LoanService>();
 builder.Services.AddScoped<IJwtHandler, JwtHandler>();
+builder.Services.AddGrpc();
+builder.Services.AddGrpcReflection();
 
 //Creando la aplicacion.
 var app = builder.Build();
@@ -83,7 +90,9 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
+
 app.UseRouting();
+app.UseCors(MyAllowSpecificOrigins);
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -91,5 +100,9 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+//app.MapGrpcReflectionService<ReturnLoanService>();
+app.MapGrpcService<ReturnLoanService>();  
+
 
 app.Run();

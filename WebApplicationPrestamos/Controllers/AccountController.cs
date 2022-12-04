@@ -32,10 +32,13 @@ namespace WebApplicationPrestamos.Controllers
 
 
                     var bearer = jwtHandler.GenerateToken(user, roles);
+               
                     return Ok(new
-                    {
-                        token = bearer,
-                    });
+                    {   username=user.Username,
+                        password=user.Password,
+                        roles=roles,
+                        token=bearer,
+                     });
                 }
                 else
                 {

@@ -1,73 +1,163 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 using WebApplicationPrestamos.DataAccess;
 using WebApplicationPrestamos.Entities;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+
 
 namespace WebApplicationPrestamos.Controllers
 {
-    [Route("api/[controller]")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public class ThingsController : ControllerBase
+    public class ThingsController : Controller
     {
-        private readonly IUnitOfWork uow;
+        private readonly ThingsContext _context;
 
-        public ThingsController(IUnitOfWork uow)
+        public ThingsController(ThingsContext context)
         {
-            this.uow = uow;
+            _context = context;
         }
 
+        // GET: Things
+        public async Task<IActionResult> Index()
+        {
+            var thingsContext = _context.Things.Include(t => t.Category);
+            return View(await thingsContext.ToListAsync());
+        }
+
+        // GET: Things/Details/5
+        public async Task<IActionResult> Details(int? id)
+        {
+            if (id == null || _context.Things == null)
+            {
+                return NotFound();
+            }
+
+            var thing = await _context.Things
+                .Include(t => t.Category)
+                .FirstOrDefaultAsync(m => m.Id == id);
+            if (thing == null)
+            {
+                return NotFound();
+            }
+
+            return View(thing);
+        }
+
+        // GET: Things/Create
+        public IActionResult Create()
+        { 
+           
+            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Description");
+            return View();
+        }
+
+        // POST: Things/Create
+        // To protect from overposting attacks, enable the specific properties you want to bind to.
+        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
-        public Thing Create([FromBody]Thing thing) //Tengamos presente que normalmente las entidades NO se utilizan como request de APIs
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(Models.ThingsDto request)
         {
-            uow.ThingRepository.Add(thing);
-            uow.Complete();
-
-            return thing; //Observar que devuelve el ID. Como es posible?
-        }
-
-        [HttpDelete]
-        [Route("{id}")]
-        public ActionResult Remove(int id)
-        {
-            var deleted = uow.ThingRepository.Delete(id);
-            if (!deleted)
+         
+            var category = await _context.Categories.FindAsync(request.CategoryId);
+            if (category == null)
                 return NotFound();
 
-            uow.Complete();
-
-            return NoContent();
-
-
-        }
-
-        [HttpGet]
-        public ActionResult<List<Thing>> GetAll()
-        {
-            return uow.ThingRepository.GetAll();
-        }
-       
-        [HttpGet]
-        [Route("{id}")]
-        public ActionResult<Thing> GetById(int id)
-        {
+            var newThing = new Thing
+                  {
+                      Description = request.Description,
+                      CreateDate = request.CreateDate,
+                      Category = category
+                  };
+         
+             _context.Add(newThing);
+             await _context.SaveChangesAsync();
            
-            return uow.ThingRepository.GetById(id);
+            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Description", newThing.CategoryId);
+            return View(newThing);
         }
 
-        [HttpPut]
-        [Route("{id}")]
-        public ActionResult<Thing> Update(int id, [FromBody] Thing thing)
-        {
-           if (id <= 0)
-                return BadRequest("Id must be higher than 0");
 
-        //    //En proyectos mas grandes es posible que primero busquen si el registro existe, si no existe, se puede devolver NotFound(). Si existe, se realiza el update.
-   
-            var savedEntity = uow.ThingRepository.Update(thing);
-  
-            return savedEntity;
+        // GET: Things/Edit/5
+        public async Task<IActionResult> Edit(int? id)
+        {
+            if (id == null || _context.Things == null)
+            {
+                return NotFound();
+            }
+
+            var thing = await _context.Things.FindAsync(id);
+            if (thing == null)
+            {
+                return NotFound();
+            }
+            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Description", thing.CategoryId);
+            return View(thing);
+        }
+
+        // POST: Things/Edit/5
+        // To protect from overposting attacks, enable the specific properties you want to bind to.
+        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, [Bind("Description,CreateDate,CategoryId,Id")] Thing thing)
+        {
+            if (id != thing.Id)
+            {
+                return NotFound();
+            }
+
+            _context.Update(thing);
+            await _context.SaveChangesAsync();
+           
+            return RedirectToAction(nameof(Index));
+        
+        }
+
+        // GET: Things/Delete/5
+        public async Task<IActionResult> Delete(int? id)
+        {
+            if (id == null || _context.Things == null)
+            {
+                return NotFound();
+            }
+
+            var thing = await _context.Things
+                .Include(t => t.Category)
+                .FirstOrDefaultAsync(m => m.Id == id);
+            if (thing == null)
+            {
+                return NotFound();
+            }
+
+            return View(thing);
+        }
+
+        // POST: Things/Delete/5
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(int id)
+        {
+            if (_context.Things == null)
+            {
+                return Problem("Entity set 'ThingsContext.Things'  is null.");
+            }
+            var thing = await _context.Things.FindAsync(id);
+            if (thing != null)
+            {
+                _context.Things.Remove(thing);
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
+        }
+
+        private bool ThingExists(int id)
+        {
+            return _context.Things.Any(e => e.Id == id);
         }
     }
 }

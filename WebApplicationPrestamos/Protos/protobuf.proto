@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+//option csharp_namespace  =  "WebApplicationPrestamos.Protos";
+
+service ReturnLoan {
+  rpc ReturnLoan (ReturnLoanRequest) returns (ReturnLoanReply);
+}
+
+message ReturnLoanRequest {
+  int32 id = 1;
+  }
+
+message ReturnLoanReply {
+  string resultado = 1;
+}

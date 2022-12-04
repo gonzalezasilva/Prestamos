@@ -8,7 +8,7 @@ namespace WebApplicationPrestamos.DataAccess
         where TEntity : EntityBase
     {
         protected ThingsContext context;
-        internal DbSet<TEntity> dbSet; //DbSet correspondiente a la entidad de este repositorio.
+        internal DbSet<TEntity> dbSet; 
 
         public GenericRepository(ThingsContext context)
         {
@@ -26,8 +26,8 @@ namespace WebApplicationPrestamos.DataAccess
         {
         
             var savedEntity = dbSet.Find(id);
-            //if (savedEntity is null)
-            //    return NotFound();
+            if (savedEntity is null)
+                return false;
 
             var result = dbSet.Remove(savedEntity);
 

@@ -6,6 +6,7 @@ namespace WebApplicationPrestamos.Entities
     {
         public int Id { get; set; }
         public string Description { get; set; }
+        public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
         //Esta lista es lo unico que necesitamos para que EF CORE entienda que la relacion entre categoria y cosas
         // es 1:N. Es una de las muchas convenciones que tiene EF CORE para representar este tipo de relaciones. 

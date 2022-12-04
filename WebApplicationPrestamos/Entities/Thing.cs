@@ -1,9 +1,19 @@
-﻿namespace WebApplicationPrestamos.Entities
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace WebApplicationPrestamos.Entities
 {
     public class Thing : EntityBase
-    {
+    { 
+        [Required(ErrorMessage = "La descripción es obligatoria.")]
+        [MaxLength(100, ErrorMessage = "La descripción solo puede tener 100 caracteres.")] 
         public string Description { get; set; }
+
+
+        public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+
         public Category Category { get; set; }
-        public int CategoryId { get; set; } //Convencion que normalmente se utiliza para dar de alta un Thing asociado a la categoria que tiene este ID.
+
+        [Required(ErrorMessage = "El objeto debe pertenecer a una categoría.")]
+        public int CategoryId { get; set; }
     }
 }

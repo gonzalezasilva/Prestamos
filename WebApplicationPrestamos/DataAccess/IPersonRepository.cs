@@ -2,9 +2,7 @@
 
 namespace WebApplicationPrestamos.DataAccess
 {
-    public interface IThingRepository : IGenericRepository<Thing>
+    public interface IPersonRepository : IGenericRepository<Person>
     {
-      
-
     }
 }
